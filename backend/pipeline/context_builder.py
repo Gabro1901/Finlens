@@ -132,6 +132,11 @@ def build_context(bundled_data: dict) -> str:
     lines.append(f"- Net Debt: {normalized.get('net_debt', 'N/A')}")
     lines.append(f"- EV / Adjusted EBITDA: {normalized.get('ev_to_ebitda', 'N/A')}")
     lines.append(f"- FCF Conversion Ratio: {normalized.get('fcf_conversion', 'N/A')}")
+    fcf_trend = normalized.get('fcf_conversion_trend', {})
+    if fcf_trend:
+        readable = ", ".join(f"{yr}: {v}x" for yr, v in fcf_trend.items())
+        lines.append(f"- FCF Conversion Trend (multi-year): {readable}")
+    lines.append(f"- Threshold Group (sector-adjusted): {normalized.get('threshold_group', 'default')}")
     lines.append(f"- ROIC Proxy: {normalized.get('roic_proxy', 'N/A')}")
     lines.append(f"- Accruals Ratio: {normalized.get('accruals_ratio', 'N/A')}")
     lines.append(f"- CapEx Intensity: {normalized.get('capex_intensity', 'N/A')}")
@@ -258,6 +263,7 @@ def build_context(bundled_data: dict) -> str:
     else:
         peer_list = peers.get("peers", [])
         if peer_list:
+            lines.append("### Peer Surface Metrics")
             lines.append("| Ticker | Market Cap | Trailing P/E | Forward P/E | EV/EBITDA | ROE | Margins | Growth |")
             lines.append("|---|---|---|---|---|---|---|---|")
             for p in peer_list:
@@ -265,5 +271,82 @@ def build_context(bundled_data: dict) -> str:
         else:
             lines.append("No peer data found.")
     lines.append("\n")
+
+    # 10b. Normalized Peer Metrics
+    normalized_peers = normalized.get("peers", [])
+    if normalized_peers:
+        lines.append("### Peer Normalized Metrics & Red Flags")
+        lines.append("| Ticker | EBITDA | Net Debt | EV/EBITDA | FCF Conv | ROIC | Accruals | CapEx Int |")
+        lines.append("|---|---|---|---|---|---|---|---|")
+        for np in normalized_peers:
+            lines.append(
+                f"| {np.get('ticker', '')} "
+                f"| {np.get('ebitda', 'N/A')} "
+                f"| {np.get('net_debt', 'N/A')} "
+                f"| {np.get('ev_to_ebitda', 'N/A')} "
+                f"| {np.get('fcf_conversion', 'N/A')} "
+                f"| {np.get('roic_proxy', 'N/A')} "
+                f"| {np.get('accruals_ratio', 'N/A')} "
+                f"| {np.get('capex_intensity', 'N/A')} |"
+            )
+            # Per-peer red flags
+            peer_flags = np.get("red_flags", [])
+            if peer_flags:
+                for pf in peer_flags:
+                    lines.append(f"  - 🚩 [{np.get('ticker', '')}] {pf}")
+        lines.append("")
+
+    # 10c. Accounting Policy Detection (from XBRL Notes)
+    accounting_policies = normalized.get("accounting_policies", {})
+    if accounting_policies:
+        lines.append("### Detected Accounting Policies (from SEC XBRL Disclosures)")
+        for policy_area, snippets in accounting_policies.items():
+            lines.append(f"- **{policy_area}**:")
+            for s in snippets[:2]:  # Max 2 snippets per area to control context size
+                if len(s) > 250:
+                    s = s[:250] + "..."
+                lines.append(f"  - {s}")
+        lines.append("")
+
+    # 11. Supply Chain Intelligence (P2)
+    supply_chain = bundled_data.get("supply_chain", {})
+    if isinstance(supply_chain, dict) and "error" not in supply_chain:
+        sc_relationships = supply_chain.get("relationships", [])
+        sc_sources = supply_chain.get("sources_used", [])
+        if sc_relationships or sc_sources:
+            lines.append("## Supply Chain Intelligence")
+            if sc_sources:
+                lines.append(f"**Data Sources**: {', '.join(sc_sources)}")
+                lines.append("")
+            if sc_relationships:
+                lines.append("### Extracted Supplier Relationships (Confidence Scored)")
+                lines.append("| Supplier | Component/Service | Relationship Type | Confidence | Score | Evidence |")
+                lines.append("|---|---|---|---|---|---|")
+                for r in sc_relationships[:10]:  # Top 10 by score
+                    supplier = r.get("supplier", "")[:30]
+                    component = r.get("component", "")[:40]
+                    rel_type = r.get("relationship_type", "")
+                    confidence = r.get("confidence_hint", "")
+                    score = r.get("confidence_score", "N/A")
+                    evidence = (r.get("evidence", "") or "")[:80]
+                    lines.append(
+                        f"| {supplier} | {component} | {rel_type} | {confidence} | {score} | {evidence} |"
+                    )
+                lines.append("")
+                # Geopolitical risk flags from conflict minerals data
+                high_risk = [r for r in sc_relationships if r.get("confidence_score", 0) >= 0.7]
+                if high_risk:
+                    lines.append("**High-Confidence Supplier Dependencies:**")
+                    for r in high_risk[:5]:
+                        lines.append(f"  - {r.get('supplier')}: {r.get('component')} (Score: {r.get('confidence_score')})")
+                    lines.append("")
+        else:
+            lines.append("## Supply Chain Intelligence")
+            lines.append("No supplier relationships extracted. Consider the supply chain risk as unknown.")
+            lines.append("")
+    elif isinstance(supply_chain, dict) and "error" in supply_chain:
+        lines.append("## Supply Chain Intelligence")
+        lines.append(f"Supply chain analysis unavailable: {supply_chain.get('error', 'Unknown error')}")
+        lines.append("")
 
     return "\n".join(lines)

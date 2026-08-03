@@ -1,6 +1,7 @@
 import asyncio
 import yfinance as yf
 import datetime
+from ..rate_limiter import sync_retry
 
 def _sanitize_value(val):
     """Convert non-JSON-serializable types to native Python equivalents."""
@@ -65,6 +66,7 @@ class MarketCollector:
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(None, self._fetch_yfinance, ticker)
 
+    @sync_retry(max_retries=3, base_delay=2.0)
     def _fetch_yfinance(self, ticker: str) -> dict:
         t = yf.Ticker(ticker)
         data = {}

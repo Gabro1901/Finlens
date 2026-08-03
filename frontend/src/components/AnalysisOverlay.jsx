@@ -8,11 +8,14 @@ const STAGES = [
   { id: 'context', label: 'Context Assembly', sublabel: 'Building intelligence context' },
   { id: 'generation', label: 'Multi-Agent Analysis', sublabel: 'Running Optimistic and Pessimistic AI in parallel' },
   { id: 'synthesis', label: 'Synthesis', sublabel: 'Adjudicating report' },
+  { id: 'valuation', label: 'Quantitative Valuation', sublabel: 'Selecting models & computing targets' },
   { id: 'complete', label: 'Complete', sublabel: 'Analysis ready' },
 ];
 
-export default function AnalysisOverlay({ currentStage, currentMessage, ticker, reportMarkdown }) {
-  if (!currentStage || currentStage === 'complete' || currentStage === 'error' || currentStage === 'cancelled' || (currentStage === 'synthesis' && reportMarkdown && reportMarkdown.length > 0)) return null;
+export default function AnalysisOverlay({ currentStage, currentMessage, ticker, reportMarkdown, valuationStreaming }) {
+  if (!currentStage || currentStage === 'complete' || currentStage === 'error' || currentStage === 'cancelled' ||
+      (currentStage === 'synthesis' && reportMarkdown && reportMarkdown.length > 0) ||
+      (currentStage === 'valuation' && valuationStreaming)) return null;
 
   const currentIndex = STAGES.findIndex(s => s.id === currentStage);
   const currentStageData = STAGES[currentIndex] || STAGES[0];

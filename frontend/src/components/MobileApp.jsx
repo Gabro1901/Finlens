@@ -14,6 +14,7 @@ export default function MobileApp({
   reportMarkdown,
   currentStage,
   currentMessage,
+  valuationStreaming,
   targetTicker,
   rawContextData,
   activeView,
@@ -179,7 +180,7 @@ export default function MobileApp({
       )}
 
       {/* Overlay & Modals */}
-      <AnalysisOverlay currentStage={isAnalyzing ? currentStage : null} currentMessage={currentMessage} ticker={targetTicker} reportMarkdown={reportMarkdown} />
+      <AnalysisOverlay currentStage={isAnalyzing ? currentStage : null} currentMessage={currentMessage} ticker={targetTicker} reportMarkdown={reportMarkdown} valuationStreaming={valuationStreaming} />
       <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} apiKeys={apiKeys} setApiKeys={setApiKeys} language={language} setLanguage={setLanguage} />
     </div>
   );

@@ -1,6 +1,6 @@
 from openai import AsyncOpenAI
 from .prompt_loader import load_prompt
-from ..config import settings
+from backend.config import settings
 import asyncio
 
 async def generate_report_full(ticker: str, context_markdown: str, llm_provider: str, api_key: str, system_prompt: str, language: str = "en") -> str:

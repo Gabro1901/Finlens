@@ -15,7 +15,17 @@ function App() {
 
   // ── Core state (preserved exactly from original) ──
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [reportMarkdown, setReportMarkdown] = useState('');
+  // Report is composed from two streaming documents:
+  //   valuationMarkdown (top) + arbiterMarkdown (bottom)
+  const [arbiterMarkdown, setArbiterMarkdown] = useState('');
+  const [valuationMarkdown, setValuationMarkdown] = useState('');
+  const [valuationStreaming, setValuationStreaming] = useState(false);
+  const reportMarkdown = (() => {
+    if (valuationMarkdown && arbiterMarkdown) {
+      return `${valuationMarkdown}\n\n---\n\n${arbiterMarkdown}`;
+    }
+    return valuationMarkdown || arbiterMarkdown;
+  })();
   const [currentStage, setCurrentStage] = useState('');
   const [currentMessage, setCurrentMessage] = useState('');
   const [targetTicker, setTargetTicker] = useState('');
@@ -120,7 +130,9 @@ function App() {
       if (res.ok) {
         const data = await res.json();
         setTargetTicker(data.ticker);
-        setReportMarkdown(data.markdown);
+        setArbiterMarkdown(data.markdown);
+        setValuationMarkdown('');
+        setValuationStreaming(false);
         setRawContextData(data.raw_data || null);
         rawContextDataRef.current = data.raw_data || null;
         setCurrentStage('complete');
@@ -152,7 +164,9 @@ function App() {
     abortControllerRef.current = abortController;
 
     setIsAnalyzing(true);
-    setReportMarkdown('');
+    setArbiterMarkdown('');
+    setValuationMarkdown('');
+    setValuationStreaming(false);
     setRawContextData(null);
     rawContextDataRef.current = null;
     setCurrentStage('init');
@@ -185,7 +199,8 @@ function App() {
       const reader = response.body.getReader();
       const decoder = new TextDecoder('utf-8');
 
-      let currentMarkdown = '';
+      let currentArbiter = '';
+      let currentValuation = '';
       let buffer = '';
       let currentEvent = '';
 
@@ -213,12 +228,37 @@ function App() {
                 setRawContextData(data);
                 rawContextDataRef.current = data;
               } else if (currentEvent === 'report_chunk') {
-                currentMarkdown += data.text;
-                setReportMarkdown(currentMarkdown);
+                currentArbiter += data.text;
+                setArbiterMarkdown(currentArbiter);
+              } else if (currentEvent === 'valuation_progress') {
+                // Drive the overlay during model selection & computation
+                setCurrentStage('valuation');
+                setCurrentMessage(data.message || '');
+                if (data.stage === 'model_selected') {
+                  setCurrentMessage(`Valuation: ${data.model?.toUpperCase()} selected (${data.business_type || ''})`);
+                }
+              } else if (currentEvent === 'valuation_chunk') {
+                // First chunk: valuation report is now the primary view — jump to top
+                if (!valuationStreaming && !currentValuation) {
+                  setValuationStreaming(true);
+                  const mainEl = document.querySelector('main');
+                  if (mainEl) mainEl.scrollTo({ top: 0, behavior: 'smooth' });
+                  else window.scrollTo({ top: 0, behavior: 'smooth' });
+                }
+                currentValuation += data.text;
+                setValuationMarkdown(currentValuation);
+                // Keep overlay hidden while report streams (valuationStreaming stays true)
+                setCurrentStage('valuation');
+              } else if (currentEvent === 'valuation_error') {
+                console.error('Valuation error:', data.message || data);
+                setCurrentMessage(`Valuation skipped: ${data.message || 'unknown error'}`);
               } else if (currentEvent === 'complete') {
                 setCurrentStage('complete');
                 setIsAnalyzing(false);
-                saveReportToHistory(ticker, currentMarkdown, rawContextDataRef.current);
+                const finalDoc = currentValuation
+                  ? `${currentValuation}\n\n---\n\n${currentArbiter}`
+                  : currentArbiter;
+                saveReportToHistory(ticker, finalDoc, rawContextDataRef.current);
                 await releaseWakeLock();
               } else if (currentEvent === 'error') {
                 setCurrentStage('error');
@@ -253,11 +293,14 @@ function App() {
       abortControllerRef.current = null;
     }
     
-    setReportMarkdown((prev) => {
-      if (!prev) return "# Analysis Cancelled\n\nGeneration was stopped before completion.";
-      return prev + "\n\n> **Analysis Cancelled**";
-    });
-
+    // Mark whichever document is active as cancelled
+    if (!arbiterMarkdown && !valuationMarkdown) {
+      setArbiterMarkdown("# Analysis Cancelled\n\nGeneration was stopped before completion.");
+    } else if (valuationStreaming) {
+      setValuationMarkdown((v) => v + "\n\n> **Analysis Cancelled**");
+    } else {
+      setArbiterMarkdown((a) => a + "\n\n> **Analysis Cancelled**");
+    }
     setIsAnalyzing(false);
     setCurrentStage('cancelled');
     await releaseWakeLock();
@@ -265,7 +308,9 @@ function App() {
 
   // ── Navigation handler ──
   const handleClearAnalysis = () => {
-    setReportMarkdown('');
+    setArbiterMarkdown('');
+    setValuationMarkdown('');
+    setValuationStreaming(false);
     setTargetTicker('');
     setRawContextData(null);
     setCurrentStage('');
@@ -276,6 +321,7 @@ function App() {
     reportMarkdown,
     currentStage,
     currentMessage,
+    valuationStreaming,
     targetTicker,
     rawContextData,
     activeView,

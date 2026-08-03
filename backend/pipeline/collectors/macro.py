@@ -1,7 +1,8 @@
 import asyncio
 from fredapi import Fred
 import wbgapi as wb
-from ...config import settings
+from backend.config import settings
+from ..rate_limiter import sync_retry
 
 class MacroCollector:
     def __init__(self):
@@ -15,6 +16,7 @@ class MacroCollector:
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(None, self._fetch_macro_data)
 
+    @sync_retry(max_retries=3, base_delay=2.0)
     def _fetch_macro_data(self) -> dict:
         data = {}
         

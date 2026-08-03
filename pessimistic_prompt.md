@@ -62,6 +62,8 @@ Immediately following this summary, you MUST output an interactive chart showing
 0. ACCOUNTING LENS & NORMALIZATION (MUST BE PRESENTED FIRST)
 Assess whether the financials of [Company] (and its peers) contain material distortions that inflate reported performance or hide fragility. Assume management has every incentive to present the rosiest picture consistent with the rules. If, after rigorous scrutiny, no material distortions are present, state that clearly — but only after exhausting the search for aggressive treatments.
 
+Use the "Detected Accounting Policies (from SEC XBRL Disclosures)" section of the context as your primary evidence base. It reflects what the company actually discloses in its XBRL footnotes — treat a detected policy as fact, and treat the ABSENCE of a disclosure (e.g., no ASC 606 revenue recognition note, no lease note) as a potential concealment of aggressive treatment or hidden fragility. Distinguish clearly between what the company discloses and what you infer.
+
 Capitalization vs. expensing policies (R&D, software, customer acquisition costs) that artificially inflate margins, ROIC, or asset quality. Identify where costs that should hit the P&L are being parked on the balance sheet, overstating true economic earnings.
 
 Revenue recognition (gross vs. net, long-term contracts, bill-and-hold) and its effect on growth quality — where is revenue pulled forward or recognized before cash is certain?
@@ -92,14 +94,17 @@ True return on invested capital (ROIC) proxy & Cash Conversion: Interpret the RO
 
 Unit economics insights: If the business has a unit (subscriber, order, vehicle, square foot), scour MD&A for signs of rising CAC, increasing churn, shrinking LTV, or lengthening payback periods. Headline revenue growth is a trap if unit profitability is deteriorating.
 
-Cash flow quality forensics: Interpret the FCF Conversion Ratio provided. A widening gap between earnings and cash is a 🚩. Focus on why conversion is decelerating — aggressive revenue recognition, ballooning working capital, or rising capex that is maintenance disguised as growth. Rely on the provided metrics and accounting adjustments to evaluate cash flow quality.
+Cash flow quality forensics: Interpret the FCF Conversion Ratio AND the multi-year "FCF Conversion Trend (multi-year)" provided. A widening gap between earnings and cash is a 🚩. Emphasize a deteriorating multi-year trend (newest year below prior years) as evidence of decelerating conversion — aggressive revenue recognition, ballooning working capital, or rising capex that is maintenance disguised as growth. Rely on the provided metrics and accounting adjustments to evaluate cash flow quality, not arithmetic from raw tables.
 
 Management signal analysis: Analyze earnings calls, shareholder letters, and footnotes for tone shifts, evasions, changes in incentive metrics, or overconfidence. Buried disclaimers, increased reliance on non-GAAP measures, and opaque segment reporting are ⚠️ signs that management sees trouble ahead.
 
 Hidden liabilities & assets: Prioritize underfunded pensions, litigation exposure, growing “other” balance-sheet lines, and off-balance-sheet commitments that could crystallize. For any assets that appear undervalued, treat them with skepticism — they are likely either illiquid, impaired, or already reflected in a stock price that is too optimistic. Frame strengths as “already priced in” or “unsustainable at current levels.”
 
+Supply Chain Intelligence & Dependencies: Analyze the provided "Supply Chain Intelligence" section. Identify high-confidence supplier relationships that represent single points of failure, geopolitical vulnerabilities (e.g., conflict minerals), or dangerous concentration risks. Treat over-reliance on a few key manufacturers or logistics providers as a critical hidden fragility.
 3. PEER RELATIVE ANOMALIES & DIVERGENCE ANALYSIS
 Compare [Company] against peers on normalized, non-obvious dimensions, hunting for unjustified valuation premiums and concealed weaknesses.
+
+The context provides a "Peer Normalized Metrics & Red Flags" table with per-peer EBITDA, net debt, EV/EBITDA, FCF conversion, ROIC proxy, accruals ratio, and CapEx intensity, plus per-peer red flags. Build every peer comparison — the accounting policy divergence table and the capital allocation analysis in particular — from these normalized figures. Do not compute peer metrics yourself from raw tables.
 
 Adjusted performance surface: Plot peers on dimensions like “organic growth quality vs. economic ROIC.” Identify where [Company] trades at a rich multiple despite fundamentals that are no better — or are worse — than peers. Flag mathematically impossible growth expectations embedded in the valuation.
 

@@ -1,6 +1,7 @@
 import asyncio
 from edgar import set_identity, Company
-from ...config import settings
+from backend.config import settings
+from ..rate_limiter import sync_retry
 
 class EdgarCollector:
     def __init__(self):
@@ -14,10 +15,13 @@ class EdgarCollector:
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(None, self._fetch_edgar_data, ticker)
 
+    @sync_retry(max_retries=3, base_delay=2.0)
     def _fetch_edgar_data(self, ticker: str) -> dict:
         try:
-            # We filter for 10-K, 10-Q, and 8-K
-            filings = Company(ticker).get_filings(form=["10-K", "10-Q", "8-K"])
+            import re
+            
+            # We filter for 10-K, 10-Q, 8-K, and SD (Conflict Minerals)
+            filings = Company(ticker).get_filings(form=["10-K", "10-Q", "8-K", "SD"])
             recent_filings = []
             
             # Get latest 5 filings metadata
@@ -69,7 +73,6 @@ class EdgarCollector:
                             combined_text = item1_text + "\n" + item1a_text
                             paragraphs = combined_text.split('\n')
                             
-                            import re
                             # Using \b to match whole words and avoid matching "open-sourcing" for "sourcing"
                             supply_chain_pattern = re.compile(r'\b(supply chain|supplier|suppliers|raw material|raw materials|vendor|vendors|manufacturing|logistics|sourcing)\b', re.IGNORECASE)
                             
@@ -89,6 +92,18 @@ class EdgarCollector:
                                 xbrl_highlights["Supply Chain & Manufacturing (10-K)"] = sc_text
                 except Exception as e:
                     xbrl_highlights["supply_chain_error"] = f"Failed to extract supply chain from 10-K: {str(e)}"
+            
+            # ──────────────────────────────────────────────
+            #  P2-1: Form SD — Conflict Minerals Disclosure
+            # ──────────────────────────────────────────────
+            try:
+                latest_sd = next((f for f in filings if f.form == "SD"), None)
+                if latest_sd:
+                    sd_data = self._extract_form_sd(latest_sd)
+                    if sd_data:
+                        xbrl_highlights["Conflict Minerals (Form SD)"] = sd_data
+            except Exception as e:
+                xbrl_highlights["form_sd_error"] = f"Failed to extract Form SD: {str(e)}"
                     
             return {
                 "recent_filings": recent_filings,
@@ -96,3 +111,115 @@ class EdgarCollector:
             }
         except Exception as e:
             return {"error": str(e)}
+    
+    def _extract_form_sd(self, sd_filing) -> str:
+        """Extract conflict minerals disclosure from Form SD filing.
+        
+        Returns structured text with smelter/refiner names, countries of origin,
+        and minerals sourced, or empty string if extraction fails.
+        """
+        import re
+        
+        try:
+            doc = sd_filing.obj()
+            if not doc:
+                full_text = sd_filing.text()
+            else:
+                # Try to get HTML or text content from the filing document
+                full_text = ""
+                if hasattr(doc, 'html') and callable(doc.html):
+                    full_text = str(doc.html())
+                elif hasattr(doc, 'text') and callable(doc.text):
+                    full_text = str(doc.text())
+                elif hasattr(doc, 'items'):
+                    # Try concatenating all sections
+                    parts = []
+                    for key in doc.items:
+                        if isinstance(doc[key], str):
+                            parts.append(doc[key])
+                    full_text = "\n".join(parts)
+                else:
+                    full_text = str(doc)
+            
+            if not full_text or len(full_text) < 100:
+                return ""
+            
+            # Clean HTML tags for text extraction
+            clean = re.sub(r'<[^>]+>', ' ', full_text)
+            clean = re.sub(r'\s+', ' ', clean)
+            
+            # Keywords for conflict minerals sections
+            conflict_patterns = [
+                r'(?i)(conflict\s*mineral|Section\s*1502|Dodd[\s-]*Frank\s*Act)',
+                r'(?i)(smelter|refiner|smelting|refining)',
+                r'(?i)(DRC|Democratic\s*Republic\s*of\s*Congo|adjoining\s*country)',
+                r'(?i)(tin|tantalum|tungsten|gold|3TG|columbite[\s-]*tantalite|coltan|cassiterite|wolframite)',
+                r'(?i)(RCOI|reasonable\s*country\s*of\s*origin|country\s*of\s*origin\s*inquiry)',
+                r'(?i)(Conflict[\s-]*Free\s*Smelter|CFS|RMI|Responsible\s*Minerals\s*Initiative)',
+            ]
+            
+            # Find paragraphs containing conflict minerals keywords
+            paragraphs = clean.split('. ')
+            extracted = []
+            for p in paragraphs:
+                p = p.strip()
+                if len(p.split()) < 8:
+                    continue
+                if any(re.search(pat, p) for pat in conflict_patterns):
+                    # Clean up partial sentences
+                    if not p.endswith(('.', '!', '?', ')', '"', "'")):
+                        p += '.'
+                    extracted.append(p)
+            
+            if not extracted:
+                return ""
+            
+            # Extract smelter/refiner names and countries
+            smelters = []
+            countries = set()
+            
+            # Pattern for smelter/refiner names (often listed as proper names)
+            smelter_pattern = re.compile(
+                r'(?i)(?:smelter|refiner|facility)[:\s]*([A-Z][A-Za-z\s&\-\.]+(?:Corporation|Inc|Ltd|Limited|Co\.|Company|Group|Metal|Gold|Tin|Tungsten|Tantalum|Minerals?|Resources?|Materials?|International|Trading|Refining|Smelting|Chemical|Industries?|Technology|Corp\.))',
+                re.IGNORECASE
+            )
+            smelter_matches = smelter_pattern.findall(clean)
+            smelters.extend([s.strip() for s in smelter_matches[:20]])
+            
+            # Extract country names
+            country_pattern = re.compile(
+                r'\b(China|Taiwan|Hong\s*Kong|Japan|Korea|South\s*Korea|India|Indonesia|Malaysia|'
+                r'Thailand|Vietnam|Philippines|Brazil|Chile|Peru|Mexico|Canada|United\s*States|'
+                r'Germany|Belgium|Italy|France|Switzerland|Sweden|Poland|Russia|Turkey|'
+                r'South\s*Africa|Rwanda|Uganda|Zambia|Namibia|Australia|Kazakhstan|'
+                r'UAE|United\s*Arab\s*Emirates|Saudi\s*Arabia|Bolivia|Argentina|Colombia)\b'
+            )
+            country_matches = country_pattern.findall(clean)
+            countries.update(c.strip() for c in country_matches)
+            
+            # Build structured output
+            lines = []
+            lines.append(f"**Form SD Filed**: {sd_filing.filing_date}")
+            lines.append("")
+            
+            if smelters:
+                lines.append("**Smelters / Refiners Identified**:")
+                for s in smelters[:15]:
+                    lines.append(f"  - {s}")
+                lines.append("")
+            
+            if countries:
+                lines.append(f"**Countries of Origin**: {', '.join(sorted(countries)[:20])}")
+                lines.append("")
+            
+            # Add key disclosure excerpts
+            lines.append("**Disclosure Excerpts**:")
+            for p in extracted[:5]:
+                if len(p) > 500:
+                    p = p[:500] + "..."
+                lines.append(f"  - {p}")
+            
+            return "\n".join(lines)
+            
+        except Exception as e:
+            return f"Form SD extraction error: {str(e)}"

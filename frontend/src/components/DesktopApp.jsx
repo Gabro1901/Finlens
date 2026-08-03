@@ -14,6 +14,7 @@ export default function DesktopApp({
   reportMarkdown,
   currentStage,
   currentMessage,
+  valuationStreaming,
   targetTicker,
   rawContextData,
   activeView,
@@ -149,7 +150,7 @@ export default function DesktopApp({
       </div>
 
       {/* ── Analysis overlay ── */}
-      <AnalysisOverlay currentStage={isAnalyzing ? currentStage : null} currentMessage={currentMessage} ticker={targetTicker} reportMarkdown={reportMarkdown} />
+      <AnalysisOverlay currentStage={isAnalyzing ? currentStage : null} currentMessage={currentMessage} ticker={targetTicker} reportMarkdown={reportMarkdown} valuationStreaming={valuationStreaming} />
 
       {/* ── Settings modal ── */}
       <SettingsModal 

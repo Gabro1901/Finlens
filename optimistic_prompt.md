@@ -62,6 +62,8 @@ Immediately following this summary, you MUST output an interactive chart showing
 0. ACCOUNTING LENS & NORMALIZATION (MUST BE PRESENTED FIRST)
 Assess where material distortions in [Company]’s reported financials (and those of the auto-selected peers) stem from accounting principles — particularly those that may be understating true economic performance. While distortions can cut both ways, this analysis prioritizes identifying conservative policies that hide value, with aggressive policies treated as secondary considerations. Quantify their impact where possible. This lens must color everything that follows.
 
+Use the "Detected Accounting Policies (from SEC XBRL Disclosures)" section of the context as your primary evidence base. It reflects what the company actually discloses in its XBRL footnotes — treat a detected policy as fact, and treat the ABSENCE of a disclosure (e.g., no ASC 606 revenue recognition note, no lease note) as a possible under-disclosure of conservative practices that hide value. Distinguish clearly between what the company discloses and what you infer.
+
 Capitalization vs. expensing policies (R&D, software, customer acquisition costs) and how they artificially deflate margins or ROIC. Highlight where a company expenses items that create durable long-term assets, causing GAAP earnings to significantly understate true economic earnings and returns on capital.
 
 Revenue recognition (gross vs. net, long-term contracts, bill-and-hold) and its effect on growth quality. Identify where conservative revenue recognition defers the booking of economic value, potentially setting up future positive surprises.
@@ -92,14 +94,17 @@ True return on invested capital (ROIC) proxy & Cash Conversion: Interpret the RO
 
 Unit economics insights: If the business has a unit (subscriber, order, vehicle, square foot), extract qualitative insights from the MD&A text regarding CAC, churn, LTV, and payback trends. Focus on improving trends and signs that unit profitability is inflecting positively, even if headline revenue growth is modest. Highlight divergence where market may be missing a customer lifetime value breakthrough.
 
-Cash flow quality forensics: Interpret the FCF Conversion Ratio provided in the Normalized Accounting section. Is conversion poised to accelerate due to operating leverage, declining capex intensity, or working capital efficiencies? Argue that cash generation is underappreciated and likely to surprise to the upside. Rely on the provided metrics and accounting adjustments.
+Cash flow quality forensics: Interpret the FCF Conversion Ratio AND the multi-year "FCF Conversion Trend (multi-year)" provided in the Normalized Accounting section. Use the multi-year trajectory (not just the latest year) to determine whether conversion is accelerating, stable, or deteriorating. A rising multi-year trend is positive evidence that cash generation is underappreciated and poised to surprise to the upside; a falling trend should temper any bullish claim. Rely on the provided metrics and accounting adjustments, not arithmetic from raw tables.
 
 Management signal analysis: Based on language in earnings calls, shareholder letters, and footnotes (tone, shifts in emphasis, changes in incentive metrics), infer what management truly believes about the company’s potential. Look for signals of underpromising, confidence in internal forecasts, strategic investments that hint at larger future rewards, and incentive structures aligned with long-term value creation.
 
 Hidden assets & undervalued resources: Intellectual property carried at zero, real estate at historical cost far below market, underutilized balance sheet capacity, overfunded pensions, or non-core assets that could be monetized. Frame any hidden liabilities as manageable, well-disclosed risks that are unlikely to materially derail the upside thesis.
 
+Supply Chain Intelligence: Analyze the provided "Supply Chain Intelligence" section. Identify high-confidence supplier relationships (especially those corroborated by multiple sources) that represent a hidden competitive moat, exclusive partnerships, or secure access to critical components. Frame supply chain concentration as a deep integration advantage rather than a fatal vulnerability.
 3. PEER RELATIVE ANOMALIES & DIVERGENCE ANALYSIS
 Compare [Company] against the auto-selected peers on normalized, non-obvious dimensions — looking for unjustified discounts and overlooked strengths.
+
+The context provides a "Peer Normalized Metrics & Red Flags" table with per-peer EBITDA, net debt, EV/EBITDA, FCF conversion, ROIC proxy, accruals ratio, and CapEx intensity, plus per-peer red flags. Build every peer comparison — the accounting policy divergence table and the capital allocation analysis in particular — from these normalized figures. Do not compute peer metrics yourself from raw tables.
 
 Adjusted performance surface: Plot peers on dimensions like “organic growth quality vs. economic ROIC” rather than headline P/E. Which company’s valuation multiple embeds a growth expectation that is far too pessimistic relative to its demonstrated fundamentals and reinvestment prowess? Highlight [Company] if it appears on the undervalued side of this surface.
 
