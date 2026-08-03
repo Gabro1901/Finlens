@@ -27,12 +27,14 @@ Data is sourced dynamically from:
 - **Public News Feeds & Congressional Disclosures**: Market sentiment and political trades.
 
 ## Features
-- **AI Analysis**: Writes reports using `deepseek-v4-pro` or OpenAI models.
-- **Peer Detection**: Uses a separate AI prompt to find direct business competitors for Comparable Company Analysis.
-- **Data Aggregation**: Pulls and cross-references data from the SEC, Yahoo Finance, and FRED.
-- **Mobile UI**: Has a mobile interface with bottom navigation.
-- **Exports**: Saves final reports as PDF or Markdown files.
-- **Interactive Chat**: Lets you ask follow-up questions about the company and the report.
+- **Multi-Agent Architecture**: Employs Optimistic, Pessimistic, and Arbiter agents for unbiased, comprehensive analysis.
+- **Advanced Valuation Engine**: Automatically selects and calculates intrinsic value using DCF, DDM, SOTP, Graham, and Peter Lynch models based on the company's sector.
+- **Supply Chain Intelligence**: Tracks global suppliers and scores relationship confidence using public manifest data (ImportYeti).
+- **Data Aggregation**: Pulls and cross-references massive datasets from SEC EDGAR, Yahoo Finance, and FRED, with built-in rate limiting.
+- **Peer Detection**: Uses targeted AI models to find direct business competitors for Comparable Company Analysis.
+- **Customizable UI**: Modern glassmorphism interface with custom accent colors and a responsive mobile view.
+- **Interactive Chat**: Lets you ask follow-up questions about the company and the generated report.
+- **Exports**: Saves final institutional-grade reports as PDF or Markdown files.
 
 ## Tech Stack
 
@@ -50,11 +52,12 @@ Data is sourced dynamically from:
 - **OpenAI Python SDK** (For LLM integration)
 
 ## Architecture
-FinLens uses an asynchronous concurrent pipeline to minimize waiting time:
-1. **Phase 1 (Metadata)**: Quickly fetches company name and sector from the market.
-2. **Phase 2 (Concurrent Aggregation)**: Spawns parallel workers to fetch SEC data, News, Macro indicators, and Intelligent Peers.
-3. **Phase 3 (Normalization)**: Cleans and standardizes the massive dataset.
-4. **Phase 4 (Generation)**: The compiled context is streamed to the LLM, which streams the formatted markdown report back to the React frontend via Server-Sent Events (SSE).
+FinLens uses an asynchronous concurrent pipeline with multi-stage AI reasoning:
+1. **Phase 1 (Metadata & Supply Chain)**: Fetches company metadata and builds a global supply chain graph (suppliers and confidence scores).
+2. **Phase 2 (Concurrent Aggregation)**: Spawns parallel workers to fetch SEC filings, News, Macro indicators, and Intelligent Peers.
+3. **Phase 3 (Valuation Math)**: Runs the custom Valuation Engine to crunch the numbers and output price targets based on financial models (DCF, SOTP, etc.).
+4. **Phase 4 (Adversarial AI Analysis)**: Feeds the compiled data into an Optimistic agent (bull case) and a Pessimistic agent (bear case).
+5. **Phase 5 (Arbiter Synthesis)**: A master Arbiter AI reviews the bull/bear arguments and the mathematical valuations to generate the final, unbiased research report.
 
 ## Installation
 
