@@ -147,6 +147,11 @@ def build_context(bundled_data: dict) -> str:
         lines.append("- AUTOMATED RED FLAGS:")
         for flag in red_flags:
             lines.append(f"  - 🚩 {flag}")
+            
+    insider_signal = normalized.get('insider_buying_signal')
+    if insider_signal:
+        lines.append(f"- POSITIVE SIGNAL: 🟢 {insider_signal}")
+        
     lines.append("\n")
 
     # 4. SEC EDGAR Disclosures
@@ -262,32 +267,143 @@ def build_context(bundled_data: dict) -> str:
         lines.append(f"Error fetching Peer data: {peers['error']}\n")
     else:
         peer_list = peers.get("peers", [])
-        if peer_list:
-            lines.append("### Peer Surface Metrics")
-            lines.append("| Ticker | Market Cap | Trailing P/E | Forward P/E | EV/EBITDA | ROE | Margins | Growth |")
+        if not peer_list:
+            lines.append("No peers could be identified. This may indicate:\n")
+            lines.append("- The company operates in a niche with few direct comparables\n")
+            lines.append("- The peer identification process failed (check data sources)\n")
+        else:
+            # --- Compute peer medians for cross-comparison ---
+            def _fmt_val(val, is_pct=False):
+                """Format a value for table display."""
+                if val is None:
+                    return "-"
+                if is_pct:
+                    if isinstance(val, (int, float)):
+                        return f"{val*100:.1f}%" if abs(val) < 10 else f"{val:.1f}%"
+                if isinstance(val, (int, float)):
+                    if abs(val) >= 1_000_000_000:
+                        return f"{val/1_000_000_000:.1f}B"
+                    if abs(val) >= 1_000_000:
+                        return f"{val/1_000_000:.1f}M"
+                    if abs(val) >= 1_000:
+                        return f"{val/1_000:.0f}K"
+                    return f"{val:.2f}"
+                return str(val)[:20]
+
+            def _peer_vals(metric, is_pct=False):
+                """Extract numeric values for a metric across peers."""
+                vals = []
+                for p in peer_list:
+                    v = p.get(metric)
+                    if v is not None and isinstance(v, (int, float)):
+                        vals.append(v)
+                return vals
+
+            def _median(vals):
+                if not vals:
+                    return None
+                sorted_vals = sorted(vals)
+                n = len(sorted_vals)
+                if n % 2 == 1:
+                    return sorted_vals[n // 2]
+                return (sorted_vals[n // 2 - 1] + sorted_vals[n // 2]) / 2
+
+            lines.append(f"### Peer Comparison ({len(peer_list)} peers identified)\n")
+
+            # --- Table 1: Valuation Multiples ---
+            lines.append("#### Valuation Multiples")
+            lines.append("| Ticker | Market Cap | EV/EBITDA | P/E (Trailing) | P/E (Forward) | P/B | P/S | EV/Revenue |")
             lines.append("|---|---|---|---|---|---|---|---|")
             for p in peer_list:
-                lines.append(f"| {p.get('ticker')} | {p.get('marketCap')} | {p.get('trailingPE')} | {p.get('forwardPE')} | {p.get('evToEbitda')} | {p.get('returnOnEquity')} | {p.get('profitMargins')} | {p.get('revenueGrowth')} |")
-        else:
-            lines.append("No peer data found.")
+                lines.append(
+                    f"| {p.get('ticker', '-')} "
+                    f"| {_fmt_val(p.get('marketCap'))} "
+                    f"| {_fmt_val(p.get('evToEbitda'))} "
+                    f"| {_fmt_val(p.get('trailingPE'))} "
+                    f"| {_fmt_val(p.get('forwardPE'))} "
+                    f"| {_fmt_val(p.get('priceToBook'))} "
+                    f"| {_fmt_val(p.get('priceToSales'))} "
+                    f"| {_fmt_val(p.get('enterpriseToRevenue'))} |"
+                )
+
+            # Median row
+            mc_med = _median(_peer_vals('marketCap'))
+            lines.append(
+                f"| **Peer Median** "
+                f"| {_fmt_val(mc_med)} "
+                f"| {_fmt_val(_median(_peer_vals('evToEbitda')))} "
+                f"| {_fmt_val(_median(_peer_vals('trailingPE')))} "
+                f"| {_fmt_val(_median(_peer_vals('forwardPE')))} "
+                f"| {_fmt_val(_median(_peer_vals('priceToBook')))} "
+                f"| {_fmt_val(_median(_peer_vals('priceToSales')))} "
+                f"| {_fmt_val(_median(_peer_vals('enterpriseToRevenue')))} |"
+            )
+            lines.append("")
+
+            # --- Table 2: Profitability & Growth ---
+            lines.append("#### Profitability & Growth")
+            lines.append("| Ticker | Gross Margin | Oper. Margin | Net Margin | ROE | ROA | Rev Growth | Earn. Growth |")
+            lines.append("|---|---|---|---|---|---|---|---|")
+            for p in peer_list:
+                lines.append(
+                    f"| {p.get('ticker', '-')} "
+                    f"| {_fmt_val(p.get('grossMargins'), True)} "
+                    f"| {_fmt_val(p.get('operatingMargins'), True)} "
+                    f"| {_fmt_val(p.get('profitMargins'), True)} "
+                    f"| {_fmt_val(p.get('returnOnEquity'), True)} "
+                    f"| {_fmt_val(p.get('returnOnAssets'), True)} "
+                    f"| {_fmt_val(p.get('revenueGrowth'), True)} "
+                    f"| {_fmt_val(p.get('earningsGrowth'), True)} |"
+                )
+            lines.append(
+                f"| **Peer Median** "
+                f"| {_fmt_val(_median(_peer_vals('grossMargins')), True)} "
+                f"| {_fmt_val(_median(_peer_vals('operatingMargins')), True)} "
+                f"| {_fmt_val(_median(_peer_vals('profitMargins')), True)} "
+                f"| {_fmt_val(_median(_peer_vals('returnOnEquity')), True)} "
+                f"| {_fmt_val(_median(_peer_vals('returnOnAssets')), True)} "
+                f"| {_fmt_val(_median(_peer_vals('revenueGrowth')), True)} "
+                f"| {_fmt_val(_median(_peer_vals('earningsGrowth')), True)} |"
+            )
+            lines.append("")
+
+            # --- Table 3: Financial Health ---
+            lines.append("#### Financial Health & Risk")
+            lines.append("| Ticker | Debt/Equity | Current Ratio | Beta | Div. Yield | Sector |")
+            lines.append("|---|---|---|---|---|---|")
+            for p in peer_list:
+                lines.append(
+                    f"| {p.get('ticker', '-')} "
+                    f"| {_fmt_val(p.get('debtToEquity'))} "
+                    f"| {_fmt_val(p.get('currentRatio'))} "
+                    f"| {_fmt_val(p.get('beta'))} "
+                    f"| {_fmt_val(p.get('dividendYield'), True)} "
+                    f"| {p.get('sector', '-')} |"
+                )
+            lines.append("")
     lines.append("\n")
 
-    # 10b. Normalized Peer Metrics
+    # 10b. Normalized Peer Metrics (quality-of-earnings cross-comparison)
     normalized_peers = normalized.get("peers", [])
     if normalized_peers:
-        lines.append("### Peer Normalized Metrics & Red Flags")
-        lines.append("| Ticker | EBITDA | Net Debt | EV/EBITDA | FCF Conv | ROIC | Accruals | CapEx Int |")
-        lines.append("|---|---|---|---|---|---|---|---|")
+        lines.append("### Peer Normalized Metrics & Earnings Quality")
+        lines.append("| Ticker | EBITDA | Net Debt | EV/EBITDA | FCF Conv | ROIC | Accruals | CapEx Int | Sector |")
+        lines.append("|---|---|---|---|---|---|---|---|---|")
         for np in normalized_peers:
+            ebitda_val = np.get('ebitda', 'N/A')
+            ebitda_str = f"{ebitda_val/1e9:.1f}B" if isinstance(ebitda_val, (int, float)) and ebitda_val >= 1e9 else str(ebitda_val)
+            net_debt_val = np.get('net_debt', 'N/A')
+            nd_str = f"{net_debt_val/1e9:.1f}B" if isinstance(net_debt_val, (int, float)) and abs(net_debt_val) >= 1e9 else str(net_debt_val)
             lines.append(
                 f"| {np.get('ticker', '')} "
-                f"| {np.get('ebitda', 'N/A')} "
-                f"| {np.get('net_debt', 'N/A')} "
+                f"| {ebitda_str} "
+                f"| {nd_str} "
                 f"| {np.get('ev_to_ebitda', 'N/A')} "
                 f"| {np.get('fcf_conversion', 'N/A')} "
                 f"| {np.get('roic_proxy', 'N/A')} "
                 f"| {np.get('accruals_ratio', 'N/A')} "
-                f"| {np.get('capex_intensity', 'N/A')} |"
+                f"| {np.get('capex_intensity', 'N/A')} "
+                f"| {np.get('sector', '-')} |"
             )
             # Per-peer red flags
             peer_flags = np.get("red_flags", [])

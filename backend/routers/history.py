@@ -16,6 +16,7 @@ class SaveHistoryRequest(BaseModel):
     ticker: str
     markdown: str
     raw_data: dict = None
+    valuation_results: dict = None
 
 @router.post("/")
 async def save_history(req: SaveHistoryRequest):
@@ -32,7 +33,8 @@ async def save_history(req: SaveHistoryRequest):
         "ticker": req.ticker.upper(),
         "date": timestamp,
         "markdown": req.markdown,
-        "raw_data": req.raw_data
+        "raw_data": req.raw_data,
+        "valuation_results": req.valuation_results
     }
     
     try:

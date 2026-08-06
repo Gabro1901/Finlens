@@ -31,6 +31,8 @@ function App() {
   const [targetTicker, setTargetTicker] = useState('');
   const [rawContextData, setRawContextData] = useState(null);
   const rawContextDataRef = useRef(null);
+  const [valuationResultsData, setValuationResultsData] = useState(null);
+  const valuationResultsDataRef = useRef(null);
   const wakeLockRef = useRef(null);
   const abortControllerRef = useRef(null);
 
@@ -104,7 +106,7 @@ function App() {
     fetchHistoryList();
   }, []);
 
-  const saveReportToHistory = async (tickerToSave, markdownToSave, rawDataToSave) => {
+  const saveReportToHistory = async (tickerToSave, markdownToSave, rawDataToSave, valuationResultsToSave) => {
     try {
       const res = await fetch(`/api/history/`, {
         method: 'POST',
@@ -112,7 +114,8 @@ function App() {
         body: JSON.stringify({ 
           ticker: tickerToSave, 
           markdown: markdownToSave,
-          raw_data: rawDataToSave
+          raw_data: rawDataToSave,
+          valuation_results: valuationResultsToSave
         })
       });
       if (res.ok) {
@@ -135,6 +138,8 @@ function App() {
         setValuationStreaming(false);
         setRawContextData(data.raw_data || null);
         rawContextDataRef.current = data.raw_data || null;
+        setValuationResultsData(data.valuation_results || null);
+        valuationResultsDataRef.current = data.valuation_results || null;
         setCurrentStage('complete');
         setActiveView('report');
       }
@@ -169,6 +174,8 @@ function App() {
     setValuationStreaming(false);
     setRawContextData(null);
     rawContextDataRef.current = null;
+    setValuationResultsData(null);
+    valuationResultsDataRef.current = null;
     setCurrentStage('init');
     setCurrentMessage('');
     setTargetTicker(ticker);
@@ -249,6 +256,9 @@ function App() {
                 setValuationMarkdown(currentValuation);
                 // Keep overlay hidden while report streams (valuationStreaming stays true)
                 setCurrentStage('valuation');
+              } else if (currentEvent === 'valuation_results') {
+                setValuationResultsData(data);
+                valuationResultsDataRef.current = data;
               } else if (currentEvent === 'valuation_error') {
                 console.error('Valuation error:', data.message || data);
                 setCurrentMessage(`Valuation skipped: ${data.message || 'unknown error'}`);
@@ -258,7 +268,7 @@ function App() {
                 const finalDoc = currentValuation
                   ? `${currentValuation}\n\n---\n\n${currentArbiter}`
                   : currentArbiter;
-                saveReportToHistory(ticker, finalDoc, rawContextDataRef.current);
+                saveReportToHistory(ticker, finalDoc, rawContextDataRef.current, valuationResultsDataRef.current);
                 await releaseWakeLock();
               } else if (currentEvent === 'error') {
                 setCurrentStage('error');
@@ -313,6 +323,7 @@ function App() {
     setValuationStreaming(false);
     setTargetTicker('');
     setRawContextData(null);
+    setValuationResultsData(null);
     setCurrentStage('');
   };
 
@@ -324,6 +335,7 @@ function App() {
     valuationStreaming,
     targetTicker,
     rawContextData,
+    valuationResultsData,
     activeView,
     setActiveView,
     isSettingsOpen,

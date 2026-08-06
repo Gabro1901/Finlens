@@ -1,0 +1,102 @@
+{
+  "sector": "Technology",
+  "threshold_group": "technology",
+  "ebitda": 165514002432,
+  "net_debt": -40357998592,
+  "ev_to_ebitda": 29.11,
+  "fcf_conversion_trend": {
+    "2026-01-31": 0.81,
+    "2025-01-31": 0.83,
+    "2024-01-31": 0.91,
+    "2023-01-31": 0.87
+  },
+  "fcf_conversion": 0.81,
+  "capex_intensity": 0.028,
+  "accruals_ratio": 0.084,
+  "roic_proxy": 0.811,
+  "accounting_policies": {
+    "Revenue Recognition": [
+      "\u26a0\ufe0f No explicit disclosure found in XBRL notes."
+    ],
+    "Stock-Based Compensation": [
+      "g other items, the amounts of purchases of invent... **StockBasedCompensation** Stock-Based Compensation We recognize stock-based compensation expense from grants of restricted stock u",
+      "g other items, the amounts of purchases of invent... **StockBasedCompensation** Stock-Based Compensation We recognize stock-based compensation expense from grants of restricted stock u",
+      "Based Compensation We recognize stock-based compensation expense from grants of restricted stock units, or RSUs, performance stock units, or PSUs, and market-based PSUs, and issuanc"
+    ]
+  },
+  "accounting_notes": "**Revenue Recognition**:\n  - \u26a0\ufe0f No explicit disclosure found in XBRL notes.\n\n**Stock-Based Compensation**:\n  - g other items, the amounts of purchases of invent... **StockBasedCompensation** Stock-Based Compensation We recognize stock-based compensation expense from grants of restricted stock u\n  - g other items, the amounts of purchases of invent... **StockBasedCompensation** Stock-Based Compensation We recognize stock-based compensation expense from grants of restricted stock u\n  - Based Compensation We recognize stock-based compensation expense from grants of restricted stock units, or RSUs, performance stock units, or PSUs, and market-based PSUs, and issuanc",
+  "peers": [
+    {
+      "ebitda": 103.36,
+      "net_debt": -1692000000,
+      "ev_to_ebitda": 7495340861.92,
+      "fcf_conversion_trend": {
+        "2025-12-31": 1.55,
+        "2024-12-31": 1.47,
+        "2023-12-31": 1.31,
+        "2022-12-31": 2.36
+      },
+      "fcf_conversion": 1.55,
+      "capex_intensity": 0.028,
+      "accruals_ratio": -0.044,
+      "roic_proxy": 0.063,
+      "ticker": "AMD",
+      "marketCap": 776410431488,
+      "trailingPE": 158.71666,
+      "forwardPE": 34.325676,
+      "evToEbitda": 103.36,
+      "returnOnEquity": 0.08063,
+      "profitMargins": 0.13374,
+      "revenueGrowth": 0.378
+    },
+    {
+      "ebitda": 29.18,
+      "net_debt": 32320000000,
+      "ev_to_ebitda": 16699409546.26,
+      "fcf_conversion_trend": {
+        "2023-12-31": -8.45,
+        "2022-12-31": -1.17
+      },
+      "fcf_conversion": -8.45,
+      "capex_intensity": 0.277,
+      "accruals_ratio": -0.047,
+      "roic_proxy": 0.015,
+      "ticker": "INTC",
+      "marketCap": 454968770560,
+      "trailingPE": null,
+      "forwardPE": 44.27298,
+      "evToEbitda": 29.18,
+      "returnOnEquity": -0.10715,
+      "profitMargins": -0.19794,
+      "revenueGrowth": 0.254
+    },
+    {
+      "ebitda": 13.5,
+      "net_debt": 9291000000,
+      "ev_to_ebitda": 12168999533.04,
+      "fcf_conversion_trend": {
+        "2025-09-30": 2.31,
+        "2024-09-30": 1.1,
+        "2023-09-30": 1.36,
+        "2022-09-30": 0.53
+      },
+      "fcf_conversion": 2.31,
+      "capex_intensity": 0.027,
+      "accruals_ratio": -0.169,
+      "roic_proxy": 0.325,
+      "ticker": "QCOM",
+      "marketCap": 154990493696,
+      "trailingPE": 16.869715,
+      "forwardPE": 14.336553,
+      "evToEbitda": 13.5,
+      "returnOnEquity": 0.33754003,
+      "profitMargins": 0.21013,
+      "revenueGrowth": -0.04
+    }
+  ],
+  "red_flags": [
+    "High Accruals Ratio (8.4% > industry threshold 8.0%). Earnings may be artificially inflated relative to cash flows.",
+    "ROIC declining significantly: 90.1% -> 81.1%.",
+    "Revenue Recognition Policy: No explicit ASC 606 / IFRS 15 disclosure found in XBRL notes \u2014 potential transparency concern."
+  ]
+}

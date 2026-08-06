@@ -7,6 +7,7 @@ import ReportViewer from './ReportViewer';
 import ChatPanel from './ChatPanel';
 import HistoryView from './HistoryView';
 import RawDataViewer from './RawDataViewer';
+import ValuationCalculationsViewer from './ValuationCalculationsViewer';
 import SettingsModal from './SettingsModal';
 
 export default function DesktopApp({
@@ -17,6 +18,7 @@ export default function DesktopApp({
   valuationStreaming,
   targetTicker,
   rawContextData,
+  valuationResultsData,
   activeView,
   setActiveView,
   isSettingsOpen,
@@ -35,7 +37,10 @@ export default function DesktopApp({
   handleSelectHistory,
   handleDeleteHistory
 }) {
-  const mainContentView = activeView === 'history' ? 'history' : activeView === 'raw' && rawContextData ? 'raw' : 'report';
+  const mainContentView = activeView === 'history' ? 'history' : 
+                          activeView === 'valuation' && valuationResultsData ? 'valuation' : 
+                          activeView === 'raw' && rawContextData ? 'raw' : 
+                          'report';
 
   return (
     <div className="h-[100dvh] w-screen flex overflow-hidden relative bg-zinc-950">
@@ -70,6 +75,7 @@ export default function DesktopApp({
             activeView={activeView}
             onViewChange={setActiveView}
             hasRawData={!!rawContextData}
+            hasValuationResults={!!valuationResultsData}
           />
 
           {/* ── Content area ── */}
@@ -117,6 +123,13 @@ export default function DesktopApp({
             {rawContextData && mainContentView === 'raw' && (
               <div className="animate-fade-in h-full">
                 <RawDataViewer data={rawContextData} />
+              </div>
+            )}
+
+            {/* Valuation Calculations view */}
+            {valuationResultsData && mainContentView === 'valuation' && (
+              <div className="animate-fade-in h-full">
+                <ValuationCalculationsViewer data={valuationResultsData} />
               </div>
             )}
 

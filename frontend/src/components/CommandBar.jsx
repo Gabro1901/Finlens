@@ -13,7 +13,8 @@ export default function CommandBar({
   ticker: activeTicker,
   activeView,
   onViewChange,
-  hasRawData 
+  hasRawData,
+  hasValuationResults
 }) {
   const [ticker, setTicker] = useState('');
   const [isExporting, setIsExporting] = useState(false);
@@ -238,6 +239,19 @@ export default function CommandBar({
           >
             Report
           </button>
+          {hasValuationResults && (
+            <button
+              onClick={() => onViewChange('valuation')}
+              className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all duration-200 ${
+                activeView === 'valuation' 
+                  ? 'bg-theme-accent text-theme-bg shadow-sm font-bold' 
+                  : 'text-zinc-400 hover:text-theme-accent'
+              }`}
+              id="view-toggle-valuation"
+            >
+              Calculations
+            </button>
+          )}
           {hasRawData && (
             <button
               onClick={() => onViewChange('raw')}

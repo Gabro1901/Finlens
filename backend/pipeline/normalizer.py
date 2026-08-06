@@ -173,58 +173,84 @@ def normalize_peer(peer: dict) -> dict:
     """Compute the same 7 normalized metrics for a single peer."""
     red_flags = []
 
-    # Build a minimal info dict from peer's existing keys
+    # Build info dict from peer's now-rich top-level keys
+    # NOTE: Previously we had `peer.get("evToEbitda")` as a fallback for ebitda,
+    # which was a critical bug (using a ratio as a dollar value). Fixed.
     info = {
-        "ebitda": peer.get("ebitda") or peer.get("evToEbitda") or 0,  # best effort
-        "totalDebt": peer.get("totalDebt", 0),
-        "totalCash": peer.get("totalCash", 0),
-        "enterpriseValue": peer.get("enterpriseValue", 0),
-        "netIncomeToCommon": peer.get("netIncomeToCommon", 0),
-        "freeCashflow": peer.get("freeCashflow", 0),
+        "ebitda": peer.get("ebitda", 0) or 0,
+        "totalDebt": peer.get("totalDebt", 0) or 0,
+        "totalCash": peer.get("totalCash", 0) or 0,
+        "enterpriseValue": peer.get("enterpriseValue", 0) or 0,
+        "netIncomeToCommon": peer.get("netIncomeToCommon", 0) or 0,
+        "freeCashflow": peer.get("freeCashflow", 0) or 0,
+        "sector": peer.get("sector"),
+        "beta": peer.get("beta"),
     }
 
     income = peer.get("income_stmt", {})
     balance = peer.get("balance_sheet", {})
     cashflow = peer.get("cashflow", {})
 
-    # Extract info from statements if not in top-level keys
+    # Extract from statements if top-level keys are missing/zero
     if not info["ebitda"]:
         ebitda_curr, _ = _get_latest_and_prev(income, ["EBITDA"])
-        info["ebitda"] = ebitda_curr or 0
+        if ebitda_curr:
+            info["ebitda"] = ebitda_curr
     if not info["netIncomeToCommon"]:
         ni_curr, _ = _get_latest_and_prev(income, ["Net Income"])
-        info["netIncomeToCommon"] = ni_curr or 0
+        if ni_curr:
+            info["netIncomeToCommon"] = ni_curr
     if not info["freeCashflow"]:
         fcf_curr, _ = _get_latest_and_prev(cashflow, ["Free Cash Flow"])
-        info["freeCashflow"] = fcf_curr or 0
+        if fcf_curr:
+            info["freeCashflow"] = fcf_curr
 
-    # Total debt from balance sheet
-    debt_curr, _ = _get_latest_and_prev(balance, ["Total Debt", "Long Term Debt"])
-    if debt_curr:
-        info["totalDebt"] = debt_curr
-    cash_curr, _ = _get_latest_and_prev(balance, ["Cash And Cash Equivalents", "Cash"])
-    if cash_curr:
-        info["totalCash"] = cash_curr
+    # Total debt from balance sheet (prefer top-level, fallback to statement)
+    if not info["totalDebt"]:
+        debt_curr, _ = _get_latest_and_prev(balance, ["Total Debt", "Long Term Debt"])
+        if debt_curr:
+            info["totalDebt"] = debt_curr
+    if not info["totalCash"]:
+        cash_curr, _ = _get_latest_and_prev(balance, ["Cash And Cash Equivalents", "Cash"])
+        if cash_curr:
+            info["totalCash"] = cash_curr
 
-    # Enterprise value from top-level if available, else approximate from market cap
+    # Enterprise value: top-level preferred, else approximate from market cap + debt - cash
     if not info["enterpriseValue"]:
         info["enterpriseValue"] = (peer.get("marketCap") or 0) + (info["totalDebt"] or 0) - (info["totalCash"] or 0)
 
-    metrics = _compute_core_metrics(info, income, balance, cashflow, red_flags)
+    # Use peer's sector for industry-adjusted thresholds, fallback to default
+    thresholds = _get_thresholds(info.get("sector")) if info.get("sector") else INDUSTRY_THRESHOLDS["default"]
 
-    # Add ticker reference
+    metrics = _compute_core_metrics(info, income, balance, cashflow, red_flags, thresholds)
+
+    # Add identity and classification
     metrics["ticker"] = peer.get("ticker", "")
+    metrics["sector"] = peer.get("sector")
+    metrics["industry"] = peer.get("industry")
     if red_flags:
         metrics["red_flags"] = red_flags
 
-    # Also carry forward the original peer metrics for backward compatibility
+    # Also carry forward the original peer surface metrics for backward compatibility
     metrics["marketCap"] = peer.get("marketCap")
+    metrics["enterpriseValue"] = peer.get("enterpriseValue")
     metrics["trailingPE"] = peer.get("trailingPE")
     metrics["forwardPE"] = peer.get("forwardPE")
+    metrics["priceToBook"] = peer.get("priceToBook")
+    metrics["priceToSales"] = peer.get("priceToSales")
     metrics["evToEbitda"] = peer.get("evToEbitda") or metrics.get("ev_to_ebitda")
+    metrics["enterpriseToRevenue"] = peer.get("enterpriseToRevenue")
     metrics["returnOnEquity"] = peer.get("returnOnEquity")
+    metrics["returnOnAssets"] = peer.get("returnOnAssets")
     metrics["profitMargins"] = peer.get("profitMargins")
+    metrics["grossMargins"] = peer.get("grossMargins")
+    metrics["operatingMargins"] = peer.get("operatingMargins")
     metrics["revenueGrowth"] = peer.get("revenueGrowth")
+    metrics["earningsGrowth"] = peer.get("earningsGrowth")
+    metrics["debtToEquity"] = peer.get("debtToEquity")
+    metrics["currentRatio"] = peer.get("currentRatio")
+    metrics["beta"] = peer.get("beta")
+    metrics["dividendYield"] = peer.get("dividendYield")
 
     return metrics
 
@@ -419,16 +445,33 @@ def normalize_accounting(bundled_data: dict) -> dict:
     insiders = market.get("insider_transactions", [])
     if isinstance(insiders, list) and len(insiders) > 0:
         sale_count = 0
+        significant_sale_count = 0
+        buy_count = 0
+        
         for tx in insiders:
             if isinstance(tx, dict):
                 text_val = str(tx).lower()
-                if 'sale' in text_val or 'sell' in text_val:
+                shares = tx.get('Shares', 0)
+                value = tx.get('Value', 0)
+                
+                is_sale = 'sale' in text_val or 'sell' in text_val or (isinstance(shares, (int, float)) and shares < 0)
+                is_buy = 'buy' in text_val or 'purchase' in text_val or (isinstance(shares, (int, float)) and shares > 0)
+                
+                if is_sale:
                     sale_count += 1
-                elif tx.get('Shares', 0) and isinstance(tx.get('Shares'), (int, float)) and tx.get('Shares') < 0:
-                    sale_count += 1
+                    # A sale is significant if value > $10M
+                    if isinstance(value, (int, float)) and abs(value) > 10000000:
+                        significant_sale_count += 1
+                elif is_buy:
+                    buy_count += 1
 
-        if sale_count > (len(insiders) / 2) and len(insiders) > 2:
-            red_flags.append("Insider Activity: Majority of recent top insider transactions are sales.")
+        # Only flag if there are multiple SIGNIFICANT sales
+        if significant_sale_count >= 2:
+            red_flags.append(f"Insider Activity: Detected {significant_sale_count} significant insider sales (>$10M). Note: selling can happen for personal reasons, but massive liquidation is a red flag.")
+            
+        # Optional: Add positive signal to normalized context if strong buying is detected
+        if buy_count > sale_count and buy_count >= 2:
+            normalized["insider_buying_signal"] = "Strong positive signal: Multiple insider purchases detected."
 
     # Low news volume
     news = bundled_data.get("news", {})

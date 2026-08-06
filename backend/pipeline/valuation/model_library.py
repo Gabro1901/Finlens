@@ -24,6 +24,15 @@ from typing import Dict, List, Any, Optional
 # HELPERS
 # ---------------------------------------------------------------------------
 
+def safe_float(val: Any, default: float = 0.0) -> float:
+    """Safely convert a value to float, handling None and empty strings."""
+    if val is None:
+        return default
+    try:
+        return float(val)
+    except (TypeError, ValueError):
+        return default
+
 def _get_fy(d: dict, key: str, year: str) -> float:
     """Get a fiscal year value from a statement dict."""
     if key not in d:
@@ -347,9 +356,21 @@ def sotp_valuation(data: dict, params: dict) -> dict:
 # 3. COMPARABLE COMPANY ANALYSIS
 # ---------------------------------------------------------------------------
 
+def _median(vals: list) -> float:
+    """Compute median of a list of values."""
+    if not vals:
+        return 0.0
+    sorted_vals = sorted(vals)
+    n = len(sorted_vals)
+    if n % 2 == 1:
+        return sorted_vals[n // 2]
+    return (sorted_vals[n // 2 - 1] + sorted_vals[n // 2]) / 2
+
+
 def comps_valuation(data: dict, params: dict) -> dict:
     """
     Comparable company analysis using peer multiples.
+    Uses median peer multiples (industry standard) with optional quality premium.
 
     Params expected from LLM:
       peer_tickers: [str]  (which peers to include)
@@ -366,37 +387,48 @@ def comps_valuation(data: dict, params: dict) -> dict:
     rev_fy25 = fin['revenue'].get(fin['fy2025'], 0)
     equity_fy25 = fin['equity'].get(fin['fy2025'], 0)
 
-    peer_tickers = params.get('peer_tickers', ['AMZN', 'GOOG'])
+    peer_tickers_specified = params.get('peer_tickers', [])
     metrics = params.get('metrics', ['ev_ebitda', 'pe'])
     quality_adj = params.get('quality_adjustment', False)
     quality_premium = params.get('quality_premium_pct', 0.30)
 
-    # Extract peer multiples
+    # If LLM didn't specify tickers, use all available peers
+    if not peer_tickers_specified and peers_raw:
+        peer_tickers_specified = [p.get('ticker', '') for p in peers_raw if p.get('ticker')]
+
+    # Extract peer multiples from the richer normalized peer data
     peer_data = {}
     for p in peers_raw:
         t = p.get('ticker', '')
-        if t not in peer_tickers:
+        if peer_tickers_specified and t not in peer_tickers_specified:
             continue
         peer_data[t] = {
-            'ev_ebitda': float(p.get('evToEbitda', p.get('ev_to_ebitda', p.get('ebitda', 0)))),
-            'trailing_pe': float(p.get('trailingPE', 0)),
-            'ev_revenue': float(p.get('enterpriseToRevenue', 0)) if 'enterpriseToRevenue' in p else 0,
-            'pb': float(p.get('priceToBook', 0)) if 'priceToBook' in p else 0,
-            'roic': float(p.get('roic_proxy', 0)),
-            'fcf_conv': float(p.get('fcf_conversion', 0)),
-            'rev_growth': float(p.get('revenueGrowth', 0)),
+            'ev_ebitda': safe_float(p.get('evToEbitda') or p.get('ev_to_ebitda')),
+            'trailing_pe': safe_float(p.get('trailingPE')),
+            'forward_pe': safe_float(p.get('forwardPE')),
+            'ev_revenue': safe_float(p.get('enterpriseToRevenue')),
+            'pb': safe_float(p.get('priceToBook')),
+            'ps': safe_float(p.get('priceToSales')),
+            'roic': safe_float(p.get('roic_proxy')),
+            'fcf_conv': safe_float(p.get('fcf_conversion')),
+            'rev_growth': safe_float(p.get('revenueGrowth')),
+            'market_cap': safe_float(p.get('marketCap')),
         }
 
     if not peer_data:
-        return {'model': 'comps', 'error': 'No peer data available for specified tickers', 'results': {}}
+        return {
+            'model': 'comps',
+            'error': 'No peer financial data available. Peers may be missing or data fetch failed.',
+            'results': {}
+        }
 
     comp_results = {}
 
     # EV/EBITDA
     if 'ev_ebitda' in metrics:
         ev_ebitda_values = [v['ev_ebitda'] for v in peer_data.values() if v['ev_ebitda'] > 0]
-        if ev_ebitda_values:
-            median_mult = sum(ev_ebitda_values) / len(ev_ebitda_values)
+        if ev_ebitda_values and ebitda_val > 0:
+            median_mult = _median(ev_ebitda_values)
             unadj_ev = median_mult * ebitda_val
             unadj_price = (unadj_ev - fin['net_debt']) / shares_out if shares_out > 0 else 0
 
@@ -408,54 +440,79 @@ def comps_valuation(data: dict, params: dict) -> dict:
                 q_mult, q_price = None, None
 
             comp_results['ev_ebitda'] = {
-                'peer_median_multiple': median_mult,
-                'quality_adjusted_multiple': q_mult,
-                'implied_price_unadjusted': unadj_price,
-                'implied_price_quality_adjusted': q_price,
+                'peer_median_multiple': round(median_mult, 2),
+                'peer_values': [round(v, 2) for v in sorted(ev_ebitda_values)],
+                'quality_adjusted_multiple': round(q_mult, 2) if q_mult else None,
+                'implied_price_unadjusted': round(unadj_price, 2) if unadj_price else None,
+                'implied_price_quality_adjusted': round(q_price, 2) if q_price else None,
             }
 
     # P/E
     if 'pe' in metrics:
         pe_values = [v['trailing_pe'] for v in peer_data.values() if v['trailing_pe'] > 0]
-        if pe_values and ni_fy25 > 0:
-            median_pe = sum(pe_values) / len(pe_values)
-            pe_price = median_pe * (ni_fy25 / shares_out) if shares_out > 0 else 0
+        if pe_values and ni_fy25 > 0 and shares_out > 0:
+            median_pe = _median(pe_values)
+            pe_price = median_pe * (ni_fy25 / shares_out)
             comp_results['pe'] = {
-                'peer_median_pe': median_pe,
-                'implied_price': pe_price,
+                'peer_median_pe': round(median_pe, 2),
+                'peer_values': [round(v, 2) for v in sorted(pe_values)],
+                'implied_price': round(pe_price, 2),
             }
 
     # EV/Revenue
     if 'ev_revenue' in metrics:
         ev_rev_values = [v['ev_revenue'] for v in peer_data.values() if v['ev_revenue'] > 0]
-        if ev_rev_values and rev_fy25 > 0:
-            median_rev = sum(ev_rev_values) / len(ev_rev_values)
+        if ev_rev_values and rev_fy25 > 0 and shares_out > 0:
+            median_rev = _median(ev_rev_values)
             rev_ev = median_rev * rev_fy25
-            rev_price = (rev_ev - fin['net_debt']) / shares_out if shares_out > 0 else 0
+            rev_price = (rev_ev - fin['net_debt']) / shares_out
             comp_results['ev_revenue'] = {
-                'peer_median_multiple': median_rev,
-                'implied_price': rev_price,
+                'peer_median_multiple': round(median_rev, 2),
+                'peer_values': [round(v, 2) for v in sorted(ev_rev_values)],
+                'implied_price': round(rev_price, 2),
             }
 
     # P/B
     if 'pb' in metrics:
         pb_values = [v['pb'] for v in peer_data.values() if v['pb'] > 0]
         if pb_values and equity_fy25 > 0 and shares_out > 0:
-            median_pb = sum(pb_values) / len(pb_values)
+            median_pb = _median(pb_values)
             pb_price = median_pb * (equity_fy25 / shares_out)
             comp_results['pb'] = {
-                'peer_median_pb': median_pb,
-                'implied_price': pb_price,
+                'peer_median_pb': round(median_pb, 2),
+                'peer_values': [round(v, 2) for v in sorted(pb_values)],
+                'implied_price': round(pb_price, 2),
             }
 
-    # Blend
+    # P/S
+    if 'ps' in metrics:
+        ps_values = [v['ps'] for v in peer_data.values() if v['ps'] > 0]
+        if ps_values and rev_fy25 > 0 and shares_out > 0:
+            median_ps = _median(ps_values)
+            ps_price = median_ps * (rev_fy25 / shares_out)
+            comp_results['ps'] = {
+                'peer_median_ps': round(median_ps, 2),
+                'peer_values': [round(v, 2) for v in sorted(ps_values)],
+                'implied_price': round(ps_price, 2),
+            }
+
+    if not comp_results:
+        return {
+            'model': 'comps',
+            'error': 'No valid peer multiples could be computed. All metrics may be zero/negative.',
+            'results': {}
+        }
+
+    # Blend: equal-weight average of all computed metric-based prices
     prices = []
     for metric_name, cr in comp_results.items():
         if metric_name == 'ev_ebitda':
-            prices.append(cr.get('implied_price_quality_adjusted') or cr['implied_price_unadjusted'])
+            p = cr.get('implied_price_quality_adjusted') or cr.get('implied_price_unadjusted')
         else:
-            if 'implied_price' in cr and cr['implied_price'] > 0:
-                prices.append(cr['implied_price'])
+            p = cr.get('implied_price')
+        if p and p > 0:
+            prices.append(p)
+
     blended = sum(prices) / len(prices) if prices else 0
 
     return {
@@ -463,13 +520,15 @@ def comps_valuation(data: dict, params: dict) -> dict:
         'error': None,
         'results': {
             'peer_tickers_used': list(peer_data.keys()),
+            'peer_count': len(peer_data),
             'peer_details': {t: {
                 'ev_ebitda': v['ev_ebitda'],
                 'pe': v['trailing_pe'],
                 'roic': v['roic'],
+                'rev_growth': v['rev_growth'],
             } for t, v in peer_data.items()},
             'metrics_computed': comp_results,
-            'blended_price': blended,
+            'blended_price': round(blended, 2),
             'current_price': current_price,
         }
     }
@@ -610,8 +669,11 @@ def ev_ebitda_valuation(data: dict, params: dict) -> dict:
 
     ebitda_used = fin['ebitda'] * (1 + ebitda_growth)
 
-    if ebitda_used <= 0 or target_mult <= 0:
-        return {'model': 'ev_ebitda', 'error': 'Invalid EBITDA or multiple', 'results': {}}
+    if ebitda_used <= 0:
+        return {'model': 'ev_ebitda', 'error': 'EBITDA is negative or zero; cannot value using EV/EBITDA', 'results': {}}
+
+    if target_mult <= 0:
+        return {'model': 'ev_ebitda', 'error': 'LLM failed to provide a valid target_ev_ebitda multiple', 'results': {}}
 
     ev = ebitda_used * target_mult
     equity_val = ev - fin['net_debt']

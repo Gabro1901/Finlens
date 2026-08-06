@@ -6,6 +6,7 @@ import MobileReportViewer from './MobileReportViewer';
 import ChatPanel from './ChatPanel';
 import HistoryView from './HistoryView';
 import RawDataViewer from './RawDataViewer';
+import ValuationCalculationsViewer from './ValuationCalculationsViewer';
 import SettingsModal from './SettingsModal';
 import MobileHome from './MobileHome';
 
@@ -17,6 +18,7 @@ export default function MobileApp({
   valuationStreaming,
   targetTicker,
   rawContextData,
+  valuationResultsData,
   activeView,
   setActiveView,
   isSettingsOpen,
@@ -36,7 +38,10 @@ export default function MobileApp({
   handleSelectHistory,
   handleDeleteHistory
 }) {
-  const mainContentView = activeView === 'history' ? 'history' : activeView === 'raw' && rawContextData ? 'raw' : 'report';
+  const mainContentView = activeView === 'history' ? 'history' : 
+                          activeView === 'valuation' && valuationResultsData ? 'valuation' : 
+                          activeView === 'raw' && rawContextData ? 'raw' : 
+                          'report';
 
   return (
     <div className="h-[100dvh] w-screen flex flex-col overflow-hidden relative bg-zinc-950">
@@ -79,6 +84,12 @@ export default function MobileApp({
           </div>
         )}
 
+        {valuationResultsData && mainContentView === 'valuation' && (
+          <div className="animate-fade-in w-full h-full p-4 pt-12">
+            <ValuationCalculationsViewer data={valuationResultsData} />
+          </div>
+        )}
+
         {mainContentView === 'history' && activeView !== 'home' && (
           <div className="animate-fade-in w-full h-full pt-safe-top mt-12">
             <HistoryView 
@@ -102,6 +113,16 @@ export default function MobileApp({
           >
             Report
           </button>
+          {valuationResultsData && (
+            <button
+              onClick={() => setActiveView('valuation')}
+              className={`px-5 py-1.5 rounded-full text-[13px] font-bold transition-all duration-200 ${
+                activeView === 'valuation' ? 'bg-theme-accent text-theme-bg shadow-md' : 'text-zinc-400'
+              }`}
+            >
+              Calculations
+            </button>
+          )}
           {rawContextData && (
             <button
               onClick={() => setActiveView('raw')}

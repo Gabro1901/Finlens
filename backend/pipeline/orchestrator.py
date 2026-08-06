@@ -136,12 +136,19 @@ async def run_pipeline(ticker: str, llm_provider: str, llm_api_key: str, fred_ap
     
     try:
         market_data = await market.collect(ticker)
-        company_name = market_data.get("info", {}).get("shortName") or market_data.get("info", {}).get("longName")
-        sector = market_data.get("info", {}).get("sector")
+        info = market_data.get("info", {})
+        company_name = info.get("shortName") or info.get("longName")
+        sector = info.get("sector")
+        industry = info.get("industry")
+        market_cap = info.get("marketCap")
+        business_summary = info.get("longBusinessSummary")
     except Exception as e:
         market_data = {"error": str(e)}
         company_name = None
         sector = None
+        industry = None
+        market_cap = None
+        business_summary = None
         
     bundled_data = {"ticker": ticker, "market": market_data}
     
@@ -154,7 +161,7 @@ async def run_pipeline(ticker: str, llm_provider: str, llm_api_key: str, fred_ap
         asyncio.create_task(macro.collect(ticker)),
         asyncio.create_task(news.collect(ticker, company_name)),
         asyncio.create_task(reg.collect(ticker, company_name, sector)),
-        asyncio.create_task(peers.collect(ticker, company_name)),
+        asyncio.create_task(peers.collect(ticker, company_name, sector, industry, market_cap, business_summary)),
         asyncio.create_task(import_yeti.collect(ticker, company_name))
     ]
     
